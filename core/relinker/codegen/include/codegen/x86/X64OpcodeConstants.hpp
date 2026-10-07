@@ -77,6 +77,9 @@ inline constexpr std::uint8_t OneByteImm8CmpAl = 0x3C;
 inline constexpr std::uint8_t OneByteMovImm8RegMin = 0xB0;
 inline constexpr std::uint8_t OneByteMovImm8RegMax = 0xB7;
 inline constexpr std::uint8_t OneBytePushImm8 = 0x6A;
+inline constexpr std::uint8_t OneByteMovMoffsMin = 0xA0;
+inline constexpr std::uint8_t OneByteMovMoffsMax = 0xA3;
+
 inline constexpr std::uint8_t OneByteTestAlImm8 = 0xA8;
 
 inline constexpr std::uint8_t OneByteImm32AluCmp = 0x81;

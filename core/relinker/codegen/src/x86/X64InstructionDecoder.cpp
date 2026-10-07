@@ -12,6 +12,7 @@ std::size_t X64InstructionDecoder::Decode(const std::uint8_t* data, std::size_t 
     bool rexPresent = false;
     std::uint8_t rex = 0;
     bool operandSizeOverride = false;
+    bool addressSizeOverride = false;
     bool repnePrefix = false;
 
     while (pos < available) {
@@ -28,6 +29,8 @@ std::size_t X64InstructionDecoder::Decode(const std::uint8_t* data, std::size_t 
             repnePrefix = true;
         } else if (b == PrefixOperandSize) {
             operandSizeOverride = true;
+        } else if (b == PrefixAddressSize) {
+            addressSizeOverride = true;
         } else if (b != PrefixLock && b != PrefixRep && b != PrefixAddressSize &&
                    b != PrefixSegCs && b != PrefixSegSs && b != PrefixSegDs &&
                    b != PrefixSegEs && b != PrefixSegFs && b != PrefixSegGs) {
@@ -175,10 +178,15 @@ std::size_t X64InstructionDecoder::Decode(const std::uint8_t* data, std::size_t 
                 immediateSize = (rexPresent && (rex & RexWBit) != 0) ? ImmSize64 :
                     (operandSizeOverride ? ImmSize16 : ImmSize32);
             } else {
-                immediateSize = operandSizeOverride ? ImmSize16 : ImmSize32;
+                const bool wideOperand = rexPresent && (rex & RexWBit) != 0;
+                immediateSize = (operandSizeOverride && !wideOperand) ? ImmSize16 : ImmSize32;
             }
         } else if (opcode == OneByteImm8Grp1 || opcode == OneByteImulRm32Imm8) {
             immediateSize = ImmSize8;
+        }
+
+        if (opcode >= OneByteMovMoffsMin && opcode <= OneByteMovMoffsMax) {
+            immediateSize = addressSizeOverride ? ImmSize32 : ImmSize64;
         }
 
         if (opcode >= OneByteJccRel8Min && opcode <= OneByteJccRel8Max) {
@@ -277,9 +285,10 @@ std::size_t X64InstructionDecoder::Decode(const std::uint8_t* data, std::size_t 
     if (!vexPresent && !twoByteOpcode &&
         (opcode == OneByteTestGrp3Rm8 || opcode == OneByteTestGrp3Rm) &&
         reg <= Grp3RegTestMax) {
+        const bool wideOperand = rexPresent && (rex & RexWBit) != 0;
         immediateSize = (opcode == OneByteTestGrp3Rm8)
             ? ImmSize8
-            : (operandSizeOverride ? ImmSize16 : ImmSize32);
+            : ((operandSizeOverride && !wideOperand) ? ImmSize16 : ImmSize32);
     }
 
     if (mod != ModRmModRegister && rm == ModRmRmSibPresent) {
