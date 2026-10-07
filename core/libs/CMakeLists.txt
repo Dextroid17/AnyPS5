@@ -177,6 +177,16 @@ if(BUILD_TESTING)
     configure_windows_unwind(savedata_replace_file_failure_tests)
     add_test(NAME savedata_replace_file_failure COMMAND savedata_replace_file_failure_tests)
 
+    add_test_executable(guest_share_extended_tests tests/GuestShareExtended.cpp)
+    target_include_directories(guest_share_extended_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(guest_share_extended_tests PRIVATE libSceShare.native libc)
+    configure_windows_unwind(guest_share_extended_tests)
+    add_test(NAME guest_share_extended COMMAND guest_share_extended_tests)
+    if(WIN32)
+        set_tests_properties(guest_share_extended PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceShare.native>")
+    endif()
+
     if(MINGW)
         target_compile_options(savedata_core_write_replacement_tests PRIVATE -fasynchronous-unwind-tables)
         target_compile_options(savedata_native_write_replacement_tests PRIVATE -fasynchronous-unwind-tables)
