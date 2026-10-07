@@ -1,6 +1,7 @@
 add_library(libSceNgs2.native SHARED EXCLUDE_FROM_ALL
         ${CMAKE_CURRENT_SOURCE_DIR}/src/Atrac9.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/Custom.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/Geom.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/Rack.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/Render.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/System.cpp
@@ -26,7 +27,7 @@ if(MINGW)
 endif()
 
 if(BUILD_TESTING)
-    foreach(ngs2Test IN ITEMS Render Atrac9 Filter Custom)
+    foreach(ngs2Test IN ITEMS Render Atrac9 Filter Custom Geom)
         string(TOLOWER ${ngs2Test} testName)
         add_test_executable(ngs2_${testName}_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/Ngs2${ngs2Test}.cpp)
         target_include_directories(ngs2_${testName}_tests PRIVATE ${LIBS_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/3rdparty/LibAtrac9/C/src)
