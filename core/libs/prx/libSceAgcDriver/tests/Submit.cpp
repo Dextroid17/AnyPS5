@@ -4,6 +4,7 @@
 #include "prx/libc/include/Shutdown.hpp"
 #include "prx/libSceAgcDriver/Submit/include/Dcb.hpp"
 #include "prx/libSceAgcDriver/Submit/include/Acb.hpp"
+#include "prx/libSceAgcDriver/Submit/include/UserData.hpp"
 #include "prx/libSceAgcDriver/Eq/include/Query.hpp"
 #include "prx/libSceAgcDriver/Eq/include/Event.hpp"
 #include "prx/libkernel/Equeue/Equeue.hpp"
@@ -129,6 +130,19 @@ void testClearState() {
         check(sceAgcDriverSubmitDcb(&packet) == 0, "CLEAR_STATE submit failed");
     }
     AgcDriverWaitIdle_nid_postfix();
+}
+
+void testUserDataPacketSize() {
+    check(sceAgcDriverUserDataGetPacketSize(0) == 3, "empty user data packet size");
+    check(sceAgcDriverUserDataGetPacketSize(1) == 4, "single byte user data packet size");
+    check(sceAgcDriverUserDataGetPacketSize(4) == 4, "one-dword user data packet size");
+    check(sceAgcDriverUserDataGetPacketSize(5) == 9, "two-dword user data packet size");
+    for (std::uint32_t bytes = 1; bytes <= 256; ++bytes) {
+        const auto dwords = static_cast<std::uint32_t>((static_cast<std::uint64_t>(bytes) + 3u) >> 2);
+        const auto expected = dwords == 1 ? 4u : dwords + 7u;
+        check(sceAgcDriverUserDataGetPacketSize(bytes) == expected, "user data packet size");
+    }
+    check(sceAgcDriverUserDataGetPacketSize(0xffffffffu) == 0x40000007u, "user data packet size does not widen to 64-bit");
 }
 
 void testSubmissions() {
@@ -489,6 +503,7 @@ int main() {
         testEvents();
         testValidation();
         testClearState();
+        testUserDataPacketSize();
         testSubmissions();
         testEndOfPipeInterrupts();
         testLabelStoredSinceSubmission();
