@@ -1,4 +1,4 @@
-"""Check that a Linux relink keeps the image base aligned to the guest segment alignment."""
+"""Check that a Linux relink keeps the image base aligned to the guest segment alignment and declares its dynamic string table."""
 
 from pathlib import Path
 import struct
@@ -7,7 +7,10 @@ import sys
 import tempfile
 
 PT_LOAD = 1
+PT_DYNAMIC = 2
 PT_SCE_VERSION = 0x6FFFFF01
+DT_STRSZ = 10
+DT_RUNPATH = 29
 
 
 def fixture():
@@ -35,6 +38,18 @@ def loads(elf):
     return [header for header in headers if header[0] == PT_LOAD]
 
 
+def dynamic_tags(elf):
+    phoff, = struct.unpack_from("<Q", elf, 0x20)
+    phentsize, phnum = struct.unpack_from("<HH", elf, 0x36)
+    headers = [struct.unpack_from("<IIQQQQQQ", elf, phoff + index * phentsize) for index in range(phnum)]
+    dynamic = next(header for header in headers if header[0] == PT_DYNAMIC)
+    tags = {}
+    for index in range(dynamic[5] // 16):
+        tag, value = struct.unpack_from("<qQ", elf, dynamic[2] + index * 16)
+        tags.setdefault(tag, value)
+    return tags
+
+
 def main():
     relinker = Path(sys.argv[1]).resolve()
     with tempfile.TemporaryDirectory(prefix="anyps5-align-") as directory:
@@ -54,6 +69,9 @@ def main():
         if alignment != 0x4000 or first[3] % alignment != 0 or first[7] != alignment:
             raise AssertionError(("first PT_LOAD is not aligned to the largest segment alignment", segments))
         assert "output.elf\nlibs/\n    *.prx\napp0/" in result.stdout, result.stdout
+        tags = dynamic_tags(output.read_bytes())
+        if not tags[DT_RUNPATH] < tags[DT_STRSZ]:
+            raise AssertionError(("DT_RUNPATH is not inside the string table", tags[DT_STRSZ], tags[DT_RUNPATH]))
         named_exe = Path(directory) / "linux.EXE"
         warning = subprocess.run([str(relinker), "--skip-sce-module", str(source), str(named_exe)], capture_output=True, text=True, timeout=20)
         assert warning.returncode == 0, (warning.stdout, warning.stderr)
