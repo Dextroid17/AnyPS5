@@ -91,16 +91,6 @@ int APS5_VABI sceAgcGetGsPrimPayload() {
  return 0;
 }
 
-int APS5_VABI sceAgcSetShaderInstrumentation() {
- NotImplemented_nid_no_patch(__func__);
- return 0;
-}
-
-int APS5_VABI sceAgcGetShaderInstrumentation() {
- NotImplemented_nid_no_patch(__func__);
- return 0;
-}
-
 APS5_EXPORT("rP5xLdOf26k", sceAgcUnknown_rP5xLdOf26k);
 int APS5_VABI sceAgcUnknown_rP5xLdOf26k() {
  NotImplemented_nid_no_patch(__func__);
