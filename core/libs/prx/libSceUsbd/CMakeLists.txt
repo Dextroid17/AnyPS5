@@ -1,5 +1,6 @@
 add_library(libSceUsbd SHARED EXCLUDE_FROM_ALL Export.cpp)
 target_include_directories(libSceUsbd PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(libSceUsbd PRIVATE SDL2-static)
 configure_windows_unwind(libSceUsbd)
 
 if(BUILD_TESTING)
