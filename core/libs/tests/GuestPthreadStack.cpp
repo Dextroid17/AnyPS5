@@ -17,6 +17,7 @@ Pthread APS5_VABI scePthreadSelf();
 static constexpr int SCE_OK = 0;
 static constexpr std::size_t FRAME_SIZE = 4096;
 static constexpr std::size_t FRAME_MARGIN = 2 * FRAME_SIZE;
+static constexpr std::size_t HOST_CALL_STACK = 256 * 1024;
 static constexpr std::size_t STACK_SIZES[] = {16384, 65536, 1u << 20, 16u << 20};
 
 thread_local unsigned char threadLocalBlock[512 * 1024];
@@ -56,6 +57,8 @@ static void* APS5_VABI Worker(void* arg) {
     Require(local - begin + FRAME_SIZE >= requested);
     const auto deepest = Descend(begin);
     Require(deepest >= begin && deepest < begin + FRAME_MARGIN);
+    const auto hostDeepest = descend(begin - HOST_CALL_STACK);
+    Require(hostDeepest < begin - HOST_CALL_STACK + FRAME_MARGIN);
 
     Require(threadLocalBlock[0] == 1 && threadLocalBlock[sizeof(threadLocalBlock) - 1] == 2);
     return arg;

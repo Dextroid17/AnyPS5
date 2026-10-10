@@ -450,6 +450,16 @@ int APS5_VABI sceKernelBatchMap2(KernelBatchMapEntry* entries, int num_entries, 
 
 }
 
+bool GuestRangeMapped(std::uintptr_t start, std::uintptr_t end) {
+    for (auto cursor = start; cursor < end;) {
+        VirtualQueryInfo info{};
+        if (sceKernelVirtualQuery(reinterpret_cast<const void*>(cursor), 0, &info, sizeof(info)) != 0) return false;
+        if (info.end <= cursor) return false;
+        cursor = info.end;
+    }
+    return true;
+}
+
 namespace {
 
 bool PageRange(void* address, std::uint64_t length, std::uintptr_t& start, std::uintptr_t& end) {
@@ -561,6 +571,7 @@ int LockHostPages(std::uintptr_t start, std::uintptr_t end) {
 }
 
 int UnlockHostPages(std::uintptr_t start, std::uintptr_t end) {
+    if (!GuestRangeMapped(start, end)) return SCE_KERNEL_ERROR_ENOMEM;
     if (::munlock(reinterpret_cast<void*>(start), end - start) == 0) return 0;
     const int error = errno;
     if (error == ENOMEM) return SCE_KERNEL_ERROR_ENOMEM;

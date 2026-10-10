@@ -42,16 +42,6 @@ bool Mapped(std::uintptr_t address) {
     VirtualQueryInfo info{};
     return sceKernelVirtualQuery(reinterpret_cast<const void*>(address), 0, &info, sizeof(info)) == 0;
 }
-
-bool RangeMapped(std::uintptr_t start, std::uintptr_t end) {
-    for (auto cursor = start; cursor < end;) {
-        VirtualQueryInfo info{};
-        if (sceKernelVirtualQuery(reinterpret_cast<const void*>(cursor), 0, &info, sizeof(info)) != 0) return false;
-        if (info.end <= cursor) return false;
-        cursor = info.end;
-    }
-    return true;
-}
 }
 
 extern "C" {
@@ -150,7 +140,7 @@ int APS5_VABI msync_nid_postfix(void* address, std::size_t length, int flags) {
     const auto end = start + size;
     if (end < start) return failed(GuestInvalid);
     if ((flags & (GuestSyncAsync | GuestSyncInvalidate)) == (GuestSyncAsync | GuestSyncInvalidate)) return failed(GuestInvalid);
-    if (start == end ? !Mapped(start) : !RangeMapped(start, end)) return failed(GuestNoMemory);
+    if (start == end ? !Mapped(start) : !GuestRangeMapped(start, end)) return failed(GuestNoMemory);
     if ((flags & GuestSyncInvalidate) != 0) throw std::runtime_error("msync: MS_INVALIDATE is not implemented");
     return 0;
 }
