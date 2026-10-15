@@ -117,7 +117,7 @@ VkFormat ResolveTextureFormat(std::uint32_t guestFormat) {
 
 std::uint32_t SrgbDecodeFormats(PFN_vkGetPhysicalDeviceFormatProperties formatProperties, VkPhysicalDevice physical) {
     const char* forced = std::getenv("APS5_SRGB_SHADER_DECODE");
-    const bool always = forced != nullptr && std::strcmp(forced, "1") == 0;
+    const bool always = forced != nullptr && (std::strcmp(forced, "1") == 0 || std::strcmp(forced, "copy") == 0);
     const auto sampled = [&](ShaderRecompiler::IrBufferFormat format) {
         VkFormatProperties properties{};
         formatProperties(physical, ResolveTextureFormat(static_cast<std::uint32_t>(format)), &properties);

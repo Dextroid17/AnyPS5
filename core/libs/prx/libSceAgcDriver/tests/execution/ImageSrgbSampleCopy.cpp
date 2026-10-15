@@ -2,6 +2,7 @@
 #include "prx/libSceAgcDriver/Execution/include/VulkanDevice.hpp"
 #include "prx/libSceAgcDriver/Graphics/include/ShaderResources.hpp"
 #include "prx/libSceAgcDriver/Graphics/include/Texture.hpp"
+#include "prx/libSceAgcDriver/Graphics/include/TextureFormat.hpp"
 #include "prx/libSceAgcDriver/Graphics/include/TextureTiling.hpp"
 #include "prx/libc/include/GuestAllocations.hpp"
 #include "prx/libc/include/GuestArena.hpp"
@@ -21,6 +22,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <span>
@@ -246,6 +248,35 @@ void CheckStorageSource(AgcDriver::VulkanDevice& device) {
     CheckStored(device, texels, 1.0f / 8.0f, "8_SRGB sample of a pending storage image after a second store");
 }
 
+std::string ForcedMode() {
+    const char* forced = std::getenv("APS5_SRGB_SHADER_DECODE");
+    return forced == nullptr ? std::string{} : std::string{forced};
+}
+
+void VKAPI_PTR NativeSrgbFormatProperties(VkPhysicalDevice, VkFormat, VkFormatProperties* properties) {
+    *properties = {};
+    properties->optimalTilingFeatures = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT | VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
+}
+
+void VKAPI_PTR NoSrgbFormatProperties(VkPhysicalDevice, VkFormat format, VkFormatProperties* properties) {
+    *properties = {};
+    if (format == VK_FORMAT_R8_SRGB || format == VK_FORMAT_R8G8_SRGB) return;
+    properties->optimalTilingFeatures = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT | VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
+}
+
+std::uint32_t SrgbBits() {
+    return AgcDriver::Graphics::SrgbDecodeFormats(NoSrgbFormatProperties, VK_NULL_HANDLE);
+}
+
+void CheckSelection() {
+    const auto mode = ForcedMode();
+    Require(SrgbBits() != 0u, "a device that cannot sample R8_SRGB or R8G8_SRGB selected no sRGB decode formats");
+    const auto decode = AgcDriver::Graphics::SrgbDecodeFormats(NativeSrgbFormatProperties, VK_NULL_HANDLE);
+    const auto copy = AgcDriver::Graphics::SrgbCopyFormats(NativeSrgbFormatProperties, VK_NULL_HANDLE, decode);
+    const std::uint32_t expected = mode == "copy" ? SrgbBits() : 0u;
+    Require(copy == expected, "a device that samples R8_SRGB and R8G8_SRGB selected sRGB copy formats " + std::to_string(copy) + " with APS5_SRGB_SHADER_DECODE='" + mode + "', expected " + std::to_string(expected));
+}
+
 void Check(AgcDriver::VulkanDevice& device, std::uint32_t format, bool second, std::uint32_t filter, bool gather, const std::string& what) {
     FillTexels(format);
     const bool between = filter == FilterBilinear;
@@ -296,8 +327,10 @@ void Check(AgcDriver::VulkanDevice& device, std::uint32_t format, bool second, s
 
 int main() {
     try {
+        CheckSelection();
         const auto device = OpenVulkanTestDevice();
         if (!device) return VulkanTestSkipped;
+        if (ForcedMode() == "copy") Require((device->Target().srgbDecodeFormats & SrgbBits()) == 0u, "APS5_SRGB_SHADER_DECODE=copy: the device cannot blit R8 or RG8 to RGBA8, so 8 and 8_8 sRGB samples have no copy");
         for (const auto format : {Srgb8, Srgb8_8}) {
             const std::string name = format == Srgb8 ? "8_SRGB" : "8_8_SRGB";
             Check(*device, format, false, FilterPoint, false, name + " point sample");
