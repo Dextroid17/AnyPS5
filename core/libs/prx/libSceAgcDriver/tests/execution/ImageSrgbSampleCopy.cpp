@@ -276,9 +276,9 @@ void Check(AgcDriver::VulkanDevice& device, std::uint32_t format, bool second, s
     for (std::uint32_t tid = 0; tid < Threads; ++tid) {
         const std::uint32_t base = tid % (Size - 1u);
         if (gather) {
-            const double near = Decode(Code(format, second, base));
-            const double far = Decode(Code(format, second, base + 1u));
-            const std::array<double, 4> expected{near, far, far, near};
+            const double low = Decode(Code(format, second, base));
+            const double high = Decode(Code(format, second, base + 1u));
+            const std::array<double, 4> expected{low, high, high, low};
             for (std::uint32_t component = 0; component < 4u; ++component) {
                 const double actual = Output[tid * 4u + component];
                 Require(Close(actual, expected[component]), what + ": thread " + std::to_string(tid) + " component " + std::to_string(component) + " gathered " + std::to_string(actual) + ", expected " + std::to_string(expected[component]));
