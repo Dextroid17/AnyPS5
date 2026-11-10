@@ -25,6 +25,7 @@
 #include <list>
 #include <mutex>
 #include <spirv/unified1/spirv.hpp>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
@@ -750,6 +751,29 @@ Pipeline::Pipeline(const Context& context, const State& state, const VertexInput
             prebuilt = true;
             return;
         }
+        // LOCAL GFXCAP PATCH (never push): APS5_GFX_DUMP=<dir> saves each stage's SPIR-V of a graphics pipeline of at
+        // least APS5_GFX_DUMP_MIN_WORDS (default 100000) words BEFORE compiling, and logs start/end with the compile time.
+        static const char* gfxDumpDir = std::getenv("APS5_GFX_DUMP");
+        static const std::size_t gfxMinWords = std::getenv("APS5_GFX_DUMP_MIN_WORDS") ? std::strtoull(std::getenv("APS5_GFX_DUMP_MIN_WORDS"), nullptr, 10) : 100000u;
+        static std::atomic<std::uint32_t> gfxSeq{0};
+        std::size_t gfxWords = 0;
+        for (const auto& compiled : shaders) gfxWords += compiled.program->spirv.size();
+        std::uint32_t gfxId = 0;
+        if (gfxDumpDir != nullptr) {
+            gfxId = ++gfxSeq;
+            if (gfxWords >= gfxMinWords) {
+                std::string sizes;
+                for (std::uint32_t i = 0; i < shaders.size(); ++i) {
+                    const auto& program = *shaders[i].program;
+                    char name[512];
+                    std::snprintf(name, sizeof(name), "%s/g_%06u_s%u_%zu.spv", gfxDumpDir, gfxId, static_cast<unsigned>(shaders[i].stage), program.spirv.size());
+                    if (std::FILE* file = std::fopen(name, "wb")) { std::fwrite(program.spirv.data(), sizeof(std::uint32_t), program.spirv.size(), file); std::fclose(file); }
+                    sizes += " s" + std::to_string(static_cast<unsigned>(shaders[i].stage)) + "=" + std::to_string(program.spirv.size());
+                }
+                std::fprintf(stderr, "[gfxcap] start id=%u words=%zu stages=%zu libraries=%d%s\n", gfxId, gfxWords, shaders.size(), libraries ? 1 : 0, sizes.c_str());
+            }
+        }
+        const auto gfxStart = std::chrono::steady_clock::now(); // after the dump, so ms is compile time only
         const VkPipelineCache pipelineCache = state.stages.tessellation && !context.tessellationPipelineCache ? VK_NULL_HANDLE : context.pipelineCache;
         if (libraries) pipeline = LinkPipelineFromLibraries(context, pipelineInfo, rendering, layoutInfo, keys, &optimized, false, _modules);
         else {
@@ -765,6 +789,10 @@ Pipeline::Pipeline(const Context& context, const State& state, const VertexInput
             raster.cullMode = VK_CULL_MODE_FRONT_BIT;
             auto pipelineCacheLock = context.LockPipelineCacheForUse();
             Check(context.Function<PFN_vkCreateGraphicsPipelines>("vkCreateGraphicsPipelines")(context.device, pipelineCache, 1, &pipelineInfo, nullptr, &backFaces), "vkCreateGraphicsPipelines");
+        }
+        if (gfxDumpDir != nullptr) {
+            const auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - gfxStart).count();
+            if (gfxWords >= gfxMinWords || ms >= 1000.0) std::fprintf(stderr, "[gfxcap] end id=%u words=%zu ms=%.1f\n", gfxId, gfxWords, ms);
         }
         for (const auto module : _modules) context.Function<PFN_vkDestroyShaderModule>("vkDestroyShaderModule")(context.device, module, nullptr);
         _modules.clear();
